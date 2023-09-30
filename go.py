@@ -1,46 +1,38 @@
+# Import necessary libraries
 import pandas as pd
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.feature_selection import RFE
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error
 
-# Assuming your data is in a DataFrame called df
-# Replace this with your actual loading mechanism
-# df = pd.read_csv("path_to_file.csv")
+# Read the data (assuming it's in a CSV format)
+data = pd.read_csv('your_data_file.csv')
 
-# Convert date columns to ordinal
-date_cols = ['RECL_DATE_SINISTRE_DT', 'RECL_DATE_RAPPORTEE_DT', 'COND_PERMIS_DATE_DT']
-for col in date_cols:
-    df[col] = pd.to_datetime(df[col], errors='coerce').apply(lambda x: x.toordinal())
+# Handle missing values (you might want to handle them differently based on your understanding of the data)
+data.fillna(method='ffill', inplace=True)  # Forward fill as a simple imputation method
 
-# Handle missing values (simple imputation for demonstration)
-df.fillna(df.mean(numeric_only=True), inplace=True)  # Numeric columns: fill with mean
-df.fillna("Unknown", inplace=True)  # Categorical columns: fill with "Unknown"
+# Convert categorical features to dummy variables (one-hot encoding)
+data = pd.get_dummies(data)
 
-# Convert categorical columns to numeric using LabelEncoder
-categorical_cols = df.select_dtypes(include='object').columns.tolist()
-le_dict = {}
-for col in categorical_cols:
-    le = LabelEncoder()
-    df[col] = le.fit_transform(df[col])
-    le_dict[col] = le
+# Split the data into training and test sets (70% training, 30% test)
+X = data.drop('RECL_COUT_REPARATION_NUM', axis=1)  # Features (excluding the target)
+y = data['RECL_COUT_REPARATION_NUM']  # Target variable
 
-# Separate features and target variable
-X = df.drop("RECL_COUT_REPARATION_NUM", axis=1)
-y = df["RECL_COUT_REPARATION_NUM"]
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
-# Scale the data
-scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X)
+# Initialize the Random Forest Regressor
+rf = RandomForestRegressor(n_estimators=100, random_state=42)
 
-# Train-test split
-X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+# Train the model
+rf.fit(X_train, y_train)
 
-# Apply RFE
-model = RandomForestRegressor()
-selector = RFE(model, n_features_to_select=20)
-selector = selector.fit(X_train, y_train)
+# Predict on the test set
+y_pred = rf.predict(X_test)
 
-# Get the top features
-top_features = X.columns[selector.support_].tolist()
-print("Top 20 Features:", top_features)
+# Calculate and print the mean squared error
+mse = mean_squared_error(y_test, y_pred)
+print(f"Mean Squared Error: {mse}")
+
+# If you want to see feature importance
+feature_importance = rf.feature_importances_
+for i, imp in enumerate(feature_importance):
+    print(f"Feature {X.columns[i]}: {imp}")
